@@ -10,32 +10,24 @@ Based on version 0.12.1.x
 Preparing system (Ubuntu 16)
 ----------------
 
-sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
+> sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
 
+> sudo apt-get install libboost-all-dev
 
-sudo apt-get install libboost-all-dev
-
-
-sudo apt-get install software-properties-common
-
-sudo add-apt-repository ppa:bitcoin/bitcoin
-
-sudo apt-get update
-
-sudo apt-get install libdb4.8-dev libdb4.8++-dev
+> sudo apt-get install software-properties-common
+> sudo add-apt-repository ppa:bitcoin/bitcoin
+> sudo apt-get update
+> sudo apt-get install libdb4.8-dev libdb4.8++-dev
 
 
 
 How to build (Ubuntu 16)
 ----------------
 
-./autogen.sh
-
-./configure
-
-make
-
-make install (optional)
+> ./autogen.sh
+> ./configure
+> make
+> make install (optional)
 
 
 License
