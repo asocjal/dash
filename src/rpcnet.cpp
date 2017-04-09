@@ -42,6 +42,54 @@ UniValue getconnectioncount(const UniValue& params, bool fHelp)
     return (int)vNodes.size();
 }
 
+UniValue getmaxconnectioncount(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getmaxconnectioncount\n"
+            "\nReturns the maximum number of connections to other nodes.\n"
+            "\nResult:\n"
+            "n          (numeric) The connection count\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getmaxconnectioncount", "")
+            + HelpExampleRpc("getmaxconnectioncount", "")
+        );
+
+    return (int)getMaxTotalConnections();
+}
+
+UniValue setmaxconnectioncount(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "setmaxconnectioncount\n"
+            "\nSets maximum number of connections\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setmaxconnectioncount", "50")
+            + HelpExampleRpc("setmaxconnectioncount", "50")
+        );
+
+    int maxTotalConnections = atoi(params[0].get_str());
+
+    if(maxTotalConnections < 0) {
+        throw runtime_error(
+            "setmaxconnectioncount\n"
+            "\nMax total connection count cannot be lower than 0 (zero)"
+        );
+    }
+
+    if(maxTotalConnections > 10000) {
+        throw runtime_error(
+            "setmaxconnectioncount\n"
+            "\nMax total connection count cannot be higher than 10000"
+        );
+    }
+
+    setMaxTotalConnections(maxTotalConnections);
+//    MAX_OUTBOUND_MASTERNODE_CONNECTIONS = v;
+    return NullUniValue;
+}
+
 UniValue ping(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)

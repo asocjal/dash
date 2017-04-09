@@ -66,8 +66,11 @@
 using namespace std;
 
 namespace {
-    const int MAX_OUTBOUND_CONNECTIONS = 8;
-    const int MAX_OUTBOUND_MASTERNODE_CONNECTIONS = 20;
+	const int MAX_OUTBOUND_CONNECTIONS = 10000;
+	const int MAX_OUTBOUND_MASTERNODE_CONNECTIONS = 10000;
+
+	CCriticalSection cs_MaxTotalConnections;
+	unsigned int nMaxTotalConnections = 100;
 
     struct ListenSocket {
         SOCKET socket;
@@ -120,6 +123,17 @@ boost::condition_variable messageHandlerCondition;
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
+
+void setMaxTotalConnections(unsigned int maxTotalConnections) {
+	LOCK(cs_MaxTotalConnections);
+	nMaxTotalConnections = maxTotalConnections;
+}
+
+unsigned int getMaxTotalConnections() {
+	LOCK(cs_MaxTotalConnections);
+	return nMaxTotalConnections;
+}
+
 
 void AddOneShot(const std::string& strDest)
 {
@@ -938,7 +952,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
     SOCKET hSocket = accept(hListenSocket.socket, (struct sockaddr*)&sockaddr, &len);
     CAddress addr;
     int nInbound = 0;
-    int nMaxInbound = nMaxConnections - MAX_OUTBOUND_CONNECTIONS;
+    int nMaxInbound = 0; //nMaxConnections - MAX_OUTBOUND_CONNECTIONS;
 
     if (hSocket != INVALID_SOCKET)
         if (!addr.SetSockAddr((const struct sockaddr*)&sockaddr))
@@ -1486,6 +1500,9 @@ void static ProcessOneShot()
         strDest = vOneShots.front();
         vOneShots.pop_front();
     }
+    if(canAddConnection() == false) {
+    	return;
+    }
     CAddress addr;
     CSemaphoreGrant grant(*semOutbound, true);
     if (grant) {
@@ -1522,6 +1539,10 @@ void ThreadOpenConnections()
         ProcessOneShot();
 
         MilliSleep(500);
+
+        if(canAddConnection() == false) {
+        	continue;
+        }
 
         CSemaphoreGrant grant(*semOutbound);
         boost::this_thread::interruption_point();
@@ -1610,6 +1631,11 @@ void ThreadOpenAddedConnections()
             }
             BOOST_FOREACH(const std::string& strAddNode, lAddresses) {
                 CAddress addr;
+
+                if(canAddConnection() == false) {
+                	continue;
+                }
+
                 CSemaphoreGrant grant(*semOutbound);
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
                 MilliSleep(500);
@@ -1656,6 +1682,9 @@ void ThreadOpenAddedConnections()
         }
         BOOST_FOREACH(vector<CService>& vserv, lservAddressesToAdd)
         {
+            if(canAddConnection() == false) {
+            	continue;
+            }
             CSemaphoreGrant grant(*semOutbound);
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
@@ -1673,6 +1702,10 @@ void ThreadMnbRequestConnections()
     while (true)
     {
         MilliSleep(1000);
+
+        if(canAddConnection() == false) {
+        	continue;
+        }
 
         CSemaphoreGrant grant(*semMasternodeOutbound);
         boost::this_thread::interruption_point();
@@ -2014,6 +2047,20 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Dump network addresses
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }
+
+bool canAddConnection()
+{
+	LOCK(cs_vNodes);
+	unsigned int maxTotalConnections = getMaxTotalConnections();
+    if(vNodes.size() > maxTotalConnections) {
+    	vNodes[0]->fDisconnect = true;
+    }
+    if(vNodes.size() >= maxTotalConnections) {
+    	return false;
+    }
+    return true;
+}
+
 
 bool StopNode()
 {
