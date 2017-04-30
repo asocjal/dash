@@ -221,7 +221,7 @@ namespace {
     set<int> setDirtyFileInfo;
 
     /** Number of peers from which we're downloading blocks. */
-    int nPeersWithValidatedDownloads = 0;
+    int nPeersWithValidatedDownloads = 0; //TODO: CD
 } // anon namespace
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1093,7 +1093,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
     if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
-        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final"); //TODO: CD
 
     // is it already in the memory pool?
     uint256 hash = tx.GetHash();
@@ -1490,7 +1490,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
 
         // Remove conflicting transactions from the mempool
         BOOST_FOREACH(const CTxMemPool::txiter it, allConflicting)
-        {
+        { //TODO: CD - replace by feee
             LogPrint("mempool", "replacing tx %s with %s for %s BTC additional fees, %d delta bytes\n",
                     it->GetTx().GetHash().ToString(),
                     hash.ToString(),
@@ -5271,7 +5271,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
     }
 }
 
-bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
+bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived) //TODO: CD - Incoming transactions
 {
     const CChainParams& chainparams = Params();
     RandAddSeedPerfmon();
@@ -5802,6 +5802,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         mapAlreadyAskedFor.erase(inv.hash);
 
+        if(AlreadyHave(inv)) {
+        	LogPrintf("CDLOG: Node sends already have transaction. Node is: %s \n", pfrom->addrName);
+        }
+
         if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
             // Process custom txes, this changes AlreadyHave to "true"
@@ -5819,6 +5823,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
 
+            pfrom->nSentNewTxs++; //TODO: CD - Multithreading problem?
+            LogPrintf("CDLOG: Update nSentNewTxs. Node is: %s, counter is %i \n", pfrom->addrName, pfrom->nSentNewTxs);
             LogPrint("mempool", "AcceptToMemoryPool: peer=%d: accepted %s (poolsz %u txn, %u kB)\n",
                 pfrom->id,
                 tx.GetHash().ToString(),
@@ -5928,7 +5934,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
             LogPrint("mempoolrej", "%s from peer=%d was not accepted: %s\n", tx.GetHash().ToString(),
                 pfrom->id,
-                FormatStateMessage(state));
+                FormatStateMessage(state)); //TODO: CD
             if (state.GetRejectCode() < REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
                 pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
                                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);

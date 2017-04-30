@@ -11,6 +11,7 @@
 #include "net.h"
 
 #include "addrman.h"
+
 #include "chainparams.h"
 #include "clientversion.h"
 #include "consensus/consensus.h"
@@ -403,6 +404,7 @@ CNode* FindNode(const CService& addr)
 
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fConnectToMasternode)
 {
+
     if (pszDest == NULL) {
         // we clean masternode connections in CMasternodeMan::ProcessMasternodeConnections()
         // so should be safe to skip this and connect to local Hot MN on CActiveMasternode::ManageState()
@@ -648,6 +650,7 @@ void CNode::AddWhitelistedRange(const CSubNet &subnet) {
 void CNode::copyStats(CNodeStats &stats)
 {
     stats.nodeid = this->GetId();
+    X(nSentNewTxs);
     X(nServices);
     X(fRelayTxes);
     X(nLastSend);
@@ -869,7 +872,8 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
                 continue;
             if (pnode->fDisconnect)
                 continue;
-            vEvictionCandidates.push_back(NodeEvictionCandidate(pnode));
+            // TODO: CD - not sure should we comment out those 2 lines
+            //vEvictionCandidates.push_back(NodeEvictionCandidate(pnode));
         }
     }
 
@@ -999,12 +1003,13 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
 
     if (nInbound >= nMaxInbound)
     {
-        if (!AttemptToEvictConnection(whitelisted)) {
-            // No connection to evict, disconnect the new connection
-            LogPrint("net", "failed to find an eviction candidate - connection dropped (full)\n");
-            CloseSocket(hSocket);
-            return;
-        }
+//TODO: CD - Not sure if we should comment out those lines:
+//        if (!AttemptToEvictConnection(whitelisted)) {
+//            // No connection to evict, disconnect the new connection
+//            LogPrint("net", "failed to find an eviction candidate - connection dropped (full)\n");
+//            CloseSocket(hSocket);
+//            return;
+//        }
     }
 
     // don't accept incoming connections until fully synced
@@ -1419,7 +1424,7 @@ void ThreadDNSAddressSeed()
     // goal: only query DNS seeds if address need is acute
     if ((addrman.size() > 0) &&
         (!GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED))) {
-        MilliSleep(11 * 1000);
+        MilliSleep(1000);
 
         LOCK(cs_vNodes);
         if (vNodes.size() >= 2) {
@@ -1537,8 +1542,8 @@ void ThreadOpenConnections()
     while (true)
     {
         ProcessOneShot();
-
-        MilliSleep(500);
+		// TODO: CD - In original it was: MilliSleep(500);
+        MilliSleep(50);
 
         if(canAddConnection() == false) {
         	continue;
@@ -1638,9 +1643,11 @@ void ThreadOpenAddedConnections()
 
                 CSemaphoreGrant grant(*semOutbound);
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
-                MilliSleep(500);
+                // TODO: CD - In original it was: MilliSleep(500);
+                MilliSleep(50);
             }
-            MilliSleep(120000); // Retry every 2 minutes
+            // TODO: CD - In original it was: MilliSleep(120000);
+            MilliSleep(60000); // Retry every 1 minute
         }
     }
 
@@ -1689,7 +1696,8 @@ void ThreadOpenAddedConnections()
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
         }
-        MilliSleep(120000); // Retry every 2 minutes
+        // TODO: CD - In original it was: MilliSleep(120000);
+        MilliSleep(60000); // Retry every 2 minutes
     }
 }
 
@@ -1701,7 +1709,8 @@ void ThreadMnbRequestConnections()
 
     while (true)
     {
-        MilliSleep(1000);
+    // TODO: CD - In original it was: MilliSleep(1000);
+        MilliSleep(50);
 
         if(canAddConnection() == false) {
         	continue;
@@ -2048,16 +2057,23 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }
 
+// TODO: CD - Own method - changes needed here
 bool canAddConnection()
 {
 	LOCK(cs_vNodes);
 	unsigned int maxTotalConnections = getMaxTotalConnections();
-    if(vNodes.size() > maxTotalConnections) {
-    	vNodes[0]->fDisconnect = true;
-    }
     if(vNodes.size() >= maxTotalConnections) {
-    	return false;
+    	CNode* minNode = vNodes[0];
+    	BOOST_FOREACH(CNode* pnode, vNodes) {
+    		if(pnode->nSentNewTxs < minNode->nSentNewTxs) {
+    			minNode = pnode;
+    		}
+    	}
+    	minNode->fDisconnect = true;
     }
+//    if(vNodes.size() >= maxTotalConnections) {
+//    	return false;
+//    }
     return true;
 }
 
@@ -2130,6 +2146,7 @@ void CExplicitNetCleanup::callCleanup()
     delete tmp; // Stroustrup's gonna kill me for that
 }
 
+/* Retransmituj transakcje */
 void RelayTransaction(const CTransaction& tx)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
@@ -2146,6 +2163,7 @@ void RelayTransaction(const CTransaction& tx)
     RelayTransaction(tx, ss);
 }
 
+/* Retransmituj transakcje */
 void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
 {
     uint256 hash = tx.GetHash();
@@ -2443,6 +2461,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     addrKnown(5000, 0.001),
     filterInventoryKnown(50000, 0.000001)
 {
+	nSentNewTxs = 0; //TODO: CD - Number of points given for node
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;

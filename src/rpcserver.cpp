@@ -270,6 +270,7 @@ static const CRPCCommand vRPCCommands[] =
     { "network",            "getconnectioncount",     &getconnectioncount,     true  },
 	{ "network",            "getmaxconnectioncount",  &getmaxconnectioncount,  true  },
 	{ "network",            "setmaxconnectioncount",  &setmaxconnectioncount,  true  },
+	{ "network",            "getsumofnewtransactions",&getsumofnewtransactions,true  },
     { "network",            "getnettotals",           &getnettotals,           true  },
     { "network",            "getpeerinfo",            &getpeerinfo,            true  },
     { "network",            "ping",                   &ping,                   true  },
