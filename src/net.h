@@ -194,7 +194,7 @@ class CNodeStats
 {
 public:
     NodeId nodeid;
-    uint32_t nSentNewTxs; //TODO: CD - how many new transaction this node sands. More means node is more usefull
+    uint32_t nSentNewTxs; //how many new transaction this node sands. More means node is more usefull
     uint64_t nServices;
     bool fRelayTxes;
     int64_t nLastSend;
@@ -322,7 +322,7 @@ typedef std::map<CSubNet, CBanEntry> banmap_t;
 class CNode
 {
 public:
-	uint32_t nSentNewTxs; //TODO: CD - how many new transaction this node sands. More means node is more usefull
+	uint32_t nSentNewTxs; //how many new transaction this node sands. More means node is more usefull
     // socket
     uint64_t nServices;
     SOCKET hSocket;

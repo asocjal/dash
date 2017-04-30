@@ -860,7 +860,8 @@ static bool CompareKeyedNetGroup(const NodeEvictionCandidate& a, const NodeEvict
 }
 
 static bool AttemptToEvictConnection(bool fPreferNewConnection) {
-    std::vector<NodeEvictionCandidate> vEvictionCandidates;
+
+	std::vector<NodeEvictionCandidate> vEvictionCandidates;
     {
         LOCK(cs_vNodes);
 
@@ -872,7 +873,6 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
                 continue;
             if (pnode->fDisconnect)
                 continue;
-            // TODO: CD - not sure should we comment out those 2 lines
             //vEvictionCandidates.push_back(NodeEvictionCandidate(pnode));
         }
     }
@@ -1003,7 +1003,6 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
 
     if (nInbound >= nMaxInbound)
     {
-//TODO: CD - Not sure if we should comment out those lines:
 //        if (!AttemptToEvictConnection(whitelisted)) {
 //            // No connection to evict, disconnect the new connection
 //            LogPrint("net", "failed to find an eviction candidate - connection dropped (full)\n");
@@ -1542,7 +1541,7 @@ void ThreadOpenConnections()
     while (true)
     {
         ProcessOneShot();
-		// TODO: CD - In original it was: MilliSleep(500);
+
         MilliSleep(50);
 
         if(canAddConnection() == false) {
@@ -1643,10 +1642,8 @@ void ThreadOpenAddedConnections()
 
                 CSemaphoreGrant grant(*semOutbound);
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
-                // TODO: CD - In original it was: MilliSleep(500);
                 MilliSleep(50);
             }
-            // TODO: CD - In original it was: MilliSleep(120000);
             MilliSleep(60000); // Retry every 1 minute
         }
     }
@@ -1696,7 +1693,6 @@ void ThreadOpenAddedConnections()
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
         }
-        // TODO: CD - In original it was: MilliSleep(120000);
         MilliSleep(60000); // Retry every 2 minutes
     }
 }
@@ -1709,7 +1705,6 @@ void ThreadMnbRequestConnections()
 
     while (true)
     {
-    // TODO: CD - In original it was: MilliSleep(1000);
         MilliSleep(50);
 
         if(canAddConnection() == false) {
@@ -2057,7 +2052,6 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }
 
-// TODO: CD - Own method - changes needed here
 bool canAddConnection()
 {
 	LOCK(cs_vNodes);
@@ -2461,7 +2455,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     addrKnown(5000, 0.001),
     filterInventoryKnown(50000, 0.000001)
 {
-	nSentNewTxs = 0; //TODO: CD - Number of points given for node
+	nSentNewTxs = 0;
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;

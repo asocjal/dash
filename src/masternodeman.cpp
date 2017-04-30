@@ -766,7 +766,6 @@ void CMasternodeMan::ProcessMasternodeConnections()
     BOOST_FOREACH(CNode* pnode, vNodes) {
         if(pnode->fMasternode) {
             if(darkSendPool.pSubmittedToMasternode != NULL && pnode->addr == darkSendPool.pSubmittedToMasternode->addr) continue;
-// TODO: CD - Not sure should we comment out those 2 lines:
 //            LogPrintf("Closing Masternode connection: peer=%d, addr=%s\n", pnode->id, pnode->addr.ToString());
 //            pnode->fDisconnect = true;
         }
