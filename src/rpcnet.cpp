@@ -90,6 +90,7 @@ UniValue setmaxconnectioncount(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
+// TODO: CD
 UniValue getsumofnewtransactions(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -209,7 +210,7 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
         obj.push_back(Pair("id", stats.nodeid));
-        obj.push_back(Pair("new_transactions_sent", (uint64_t)stats.nSentNewTxs));
+        obj.push_back(Pair("new_transactions_sent", (uint64_t)stats.nSentNewTxs)); //TODO: CD - Own code
         obj.push_back(Pair("addr", stats.addrName));
         if (!(stats.addrLocal.empty()))
             obj.push_back(Pair("addrlocal", stats.addrLocal));
