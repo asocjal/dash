@@ -1626,7 +1626,7 @@ void ThreadOpenAddedConnections()
     {
         LOCK(cs_vAddedNodes);
         vAddedNodes = mapMultiArgs["-addnode"];
-        loadNodes();
+        loadUsefulPeers();
     }
 
     if (HaveNameProxy()) {
@@ -2068,10 +2068,10 @@ int sumSentNewTxs() {
 	return sum;
 }
 
-void saveNodes() {
-	LogPrintf("Saving nodes\n");
+void saveUsefulPeers() {
+	LogPrintf("Saving Useful Peers\n");
 	std::ofstream myfile;
-	boost::filesystem::path filePath = GetDataDir() / "useful_nodes.txt";
+	boost::filesystem::path filePath = GetDataDir() / "useful_peers.txt";
 	myfile.open(filePath.string().c_str());
 
 	BOOST_FOREACH(CNode* pnode, vNodes) {
@@ -2086,12 +2086,13 @@ void saveNodes() {
 	myfile.close();
 }
 
-void loadNodes() {
-	  string line;
-	  boost::filesystem::path filePath = GetDataDir() / "useful_nodes.txt";
-	  ifstream myfile(filePath.string().c_str());
-	  if (myfile.is_open())
-	  {
+void loadUsefulPeers() {
+	LogPrintf("Loading Useful Peers\n");
+	string line;
+	boost::filesystem::path filePath = GetDataDir() / "useful_peers.txt";
+	ifstream myfile(filePath.string().c_str());
+	if (myfile.is_open())
+	{
 	    while ( getline (myfile,line) )
 	    {
 	    	if(line.empty() == false) {
@@ -2099,9 +2100,10 @@ void loadNodes() {
 	    	}
 	    }
 	    myfile.close();
-	  }
-
-	  else LogPrintf("Warning: cannot open nodes file (loadNodes method)\n");
+	}
+	else {
+		LogPrintf("Warning: cannot open useful_peers.txt file\n");
+	}
 
 }
 
@@ -2122,7 +2124,7 @@ bool canAddConnection()
 //    	return false;
 //    }
     if(sumSentNewTxs() > 30) {
-    	saveNodes();
+    	saveUsefulPeers();
     }
     return true;
 }

@@ -142,8 +142,8 @@ enum
 };
 
 int sumSentNewTxs();
-void loadNodes();
-void saveNodes();
+void loadUsefulPeers();
+void saveUsefulPeers();
 bool canAddConnection();
 bool IsPeerAddrLocalGood(CNode *pnode);
 void AdvertiseLocal(CNode *pnode);
