@@ -141,6 +141,9 @@ enum
     LOCAL_MAX
 };
 
+int sumSentNewTxs();
+void loadNodes();
+void saveNodes();
 bool canAddConnection();
 bool IsPeerAddrLocalGood(CNode *pnode);
 void AdvertiseLocal(CNode *pnode);

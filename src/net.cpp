@@ -46,6 +46,8 @@
 
 #include <math.h>
 
+#include <fstream>
+
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
@@ -1624,6 +1626,7 @@ void ThreadOpenAddedConnections()
     {
         LOCK(cs_vAddedNodes);
         vAddedNodes = mapMultiArgs["-addnode"];
+        loadNodes();
     }
 
     if (HaveNameProxy()) {
@@ -2057,12 +2060,56 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }
 
-// TODO: CD - Own method - changes needed here
+int sumSentNewTxs() {
+	int sum = 0;
+	BOOST_FOREACH(CNode* pnode, vNodes) {
+		sum += pnode->nSentNewTxs;
+	}
+	return sum;
+}
+
+void saveNodes() {
+	LogPrintf("Saving nodes\n");
+	std::ofstream myfile;
+	boost::filesystem::path filePath = GetDataDir() / "useful_nodes.txt";
+	myfile.open(filePath.string().c_str());
+
+	BOOST_FOREACH(CNode* pnode, vNodes) {
+		if(pnode->nSentNewTxs > 0) {
+			myfile << pnode->addrName;
+			myfile << "\n";
+//			myfile << pnode->nSentNewTxs;
+//			myfile << "\n";
+		}
+	}
+
+	myfile.close();
+}
+
+void loadNodes() {
+	  string line;
+	  boost::filesystem::path filePath = GetDataDir() / "useful_nodes.txt";
+	  ifstream myfile(filePath.string().c_str());
+	  if (myfile.is_open())
+	  {
+	    while ( getline (myfile,line) )
+	    {
+	    	if(line.empty() == false) {
+	    		vAddedNodes.push_back(line);
+	    	}
+	    }
+	    myfile.close();
+	  }
+
+	  else LogPrintf("Warning: cannot open nodes file (loadNodes method)\n");
+
+}
+
 bool canAddConnection()
 {
 	LOCK(cs_vNodes);
 	unsigned int maxTotalConnections = getMaxTotalConnections();
-    if(vNodes.size() >= maxTotalConnections) {
+    if(vNodes.size() > maxTotalConnections) {
     	CNode* minNode = vNodes[0];
     	BOOST_FOREACH(CNode* pnode, vNodes) {
     		if(pnode->nSentNewTxs < minNode->nSentNewTxs) {
@@ -2074,6 +2121,9 @@ bool canAddConnection()
 //    if(vNodes.size() >= maxTotalConnections) {
 //    	return false;
 //    }
+    if(sumSentNewTxs() > 30) {
+    	saveNodes();
+    }
     return true;
 }
 
