@@ -101,6 +101,15 @@ void SocketSendData(CNode *pnode);
 
 typedef int NodeId;
 
+struct Conflicted
+{
+	std::string txId1;
+	std::string txId2;
+};
+
+extern std::list<Conflicted> conflictedList;
+extern CCriticalSection csConflictedList;
+
 struct CombinerAll
 {
     typedef bool result_type;

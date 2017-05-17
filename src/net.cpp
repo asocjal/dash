@@ -68,6 +68,9 @@
 
 using namespace std;
 
+std::list<Conflicted> conflictedList;
+CCriticalSection csConflictedList;
+
 namespace {
 	const int MAX_OUTBOUND_CONNECTIONS = 10000;
 	const int MAX_OUTBOUND_MASTERNODE_CONNECTIONS = 10000;

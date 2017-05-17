@@ -29,6 +29,8 @@
 using namespace RPCServer;
 using namespace std;
 
+bool appClosing = false;
+
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;
 static std::string rpcWarmupStatus("RPC server started");
@@ -267,6 +269,7 @@ static const CRPCCommand vRPCCommands[] =
     { "network",            "addnode",                &addnode,                true  },
     { "network",            "disconnectnode",         &disconnectnode,         true  },
     { "network",            "getaddednodeinfo",       &getaddednodeinfo,       true  },
+	{ "network",            "getconflictedtransactions", &getconflictedtransactions, true  },
     { "network",            "getconnectioncount",     &getconnectioncount,     true  },
 	{ "network",            "getmaxconnectioncount",  &getmaxconnectioncount,  true  },
 	{ "network",            "setmaxconnectioncount",  &setmaxconnectioncount,  true  },

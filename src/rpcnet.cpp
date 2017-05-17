@@ -20,9 +20,42 @@
 
 #include <boost/foreach.hpp>
 
-#include <univalue.h>
-
 using namespace std;
+
+//static CSemaphore *semWait = new CSemaphore(10);
+
+UniValue getconflictedtransactions(const UniValue& params, bool fHelp)
+{
+
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getconflictedtransactions\n"
+            "\nResturnes list of conflicted transactions\n"
+            "\nResult:\n"
+            "n          Rejected transaction\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getconflictedtransactions", "")
+            + HelpExampleRpc("getconflictedtransactions", "")
+        );
+
+	UniValue ret(UniValue::VARR);
+
+	LOCK(csConflictedList);
+
+	BOOST_FOREACH(const Conflicted &conflicted, conflictedList) {
+		UniValue obj(UniValue::VOBJ);
+		obj.push_back(Pair("tx_id_1", conflicted.txId1));
+		obj.push_back(Pair("tx_id_2", conflicted.txId2));
+		ret.push_back(obj);
+	}
+
+//	Conflicted conflicted;
+//	conflicted.txId1 = "abc";
+//	conflicted.txId2 = "drf";
+//	conflictedList.push_back(conflicted);
+
+    return ret;
+}
 
 UniValue getconnectioncount(const UniValue& params, bool fHelp)
 {
@@ -104,19 +137,13 @@ UniValue getsumofnewtransactions(const UniValue& params, bool fHelp)
 
     uint32_t sum = 0;
 
-    LOCK(cs_vNodes);
-    BOOST_FOREACH(CNode* pnode, vNodes) {
-    	sum+= pnode->nSentNewTxs;
+    {
+		LOCK(cs_vNodes);
+		BOOST_FOREACH(CNode* pnode, vNodes) {
+			sum+= pnode->nSentNewTxs;
+		}
     }
-//
-//    vector<CNodeStats> vstats;
-//    CopyNodeStats(vstats);
-//
-//
-//
-//    BOOST_FOREACH(const CNodeStats& stats, vstats) {
-//    	sum+= stats.nSentNewTxs;
-//    } //TODO: CD - finish
+
     return (int)sum;
 }
 

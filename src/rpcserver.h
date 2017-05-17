@@ -19,6 +19,8 @@
 
 #include <univalue.h>
 
+extern bool appClosing;
+
 class CRPCCommand;
 
 namespace RPCServer
@@ -171,6 +173,8 @@ extern std::string HelpExampleRpc(const std::string& methodname, const std::stri
 
 extern void EnsureWalletIsUnlocked();
 
+
+extern UniValue getconflictedtransactions(const UniValue& params, bool fHelp); // in rpcnet.cpp
 extern UniValue getconnectioncount(const UniValue& params, bool fHelp); // in rpcnet.cpp
 extern UniValue getmaxconnectioncount(const UniValue& params, bool fHelp); // in rpcnet.cpp
 extern UniValue setmaxconnectioncount(const UniValue& params, bool fHelp); // in rpcnet.cpp

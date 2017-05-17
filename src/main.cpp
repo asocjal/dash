@@ -1061,6 +1061,20 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetRejectCode());
 }
 
+void addConflictedTransactions(const std::string &hash1, const std::string &hash2) {
+	LOCK(csConflictedList);
+	LogPrint("mempool", "CDLOG: Adding conflicted");
+	Conflicted conflicted;
+	conflicted.txId1 = hash1;
+	conflicted.txId2 = hash2;
+	conflictedList.push_back(conflicted);
+
+	if(conflictedList.size() > 1000) {
+		conflictedList.pop_front();
+	}
+	LogPrint("mempool", "CDLOG: Conflict between %s and %s \n", hash1, hash2);
+}
+
 bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                               bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee,
                               std::vector<uint256>& vHashTxnToUncache, bool fDryRun)
@@ -1129,11 +1143,13 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
                 // InstantSend txes are not replacable
                 if(instantsend.HasTxLockRequest(ptxConflicting->GetHash())) {
                     // this tx conflicts with a Transaction Lock Request candidate
+                	addConflictedTransactions(hash.ToString(), ptxConflicting->GetHash().ToString());
                     return state.DoS(0, error("AcceptToMemoryPool : Transaction %s conflicts with Transaction Lock Request %s",
                                             hash.ToString(), ptxConflicting->GetHash().ToString()),
                                     REJECT_INVALID, "tx-txlockreq-mempool-conflict");
                 } else if (instantsend.HasTxLockRequest(hash)) {
                     // this tx is a tx lock request and it conflicts with a normal tx
+                	addConflictedTransactions(hash.ToString(), ptxConflicting->GetHash().ToString());
                     return state.DoS(0, error("AcceptToMemoryPool : Transaction Lock Request %s conflicts with transaction %s",
                                             hash.ToString(), ptxConflicting->GetHash().ToString()),
                                     REJECT_INVALID, "txlockreq-tx-mempool-conflict");
@@ -1162,9 +1178,11 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
                         }
                     }
                 }
-                if (fReplacementOptOut)
-                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
 
+                if (fReplacementOptOut) {
+                	addConflictedTransactions(tx.GetHash().ToString(), ptxConflicting->GetHash().ToString());
+                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+                }
                 setConflicts.insert(ptxConflicting->GetHash());
             }
         }
@@ -5932,9 +5950,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         int nDoS = 0;
         if (state.IsInvalid(nDoS))
         {
-            LogPrint("mempoolrej", "%s from peer=%d was not accepted: %s\n", tx.GetHash().ToString(),
-                pfrom->id,
-                FormatStateMessage(state)); //TODO: CD
+            LogPrint("mempoolrej", "%s from peer=%d was not accepted: %s\n", tx.GetHash().ToString(), //TODO: CD - Transaction rejected
+            pfrom->id,
+            FormatStateMessage(state)); //TODO: CD
+
             if (state.GetRejectCode() < REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
                 pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
                                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);

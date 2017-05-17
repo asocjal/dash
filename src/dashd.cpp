@@ -182,6 +182,8 @@ bool AppInit(int argc, char* argv[])
     }
     Shutdown();
 
+    appClosing = true;
+
     return fRet;
 }
 
