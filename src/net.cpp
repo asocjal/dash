@@ -45,6 +45,9 @@
 
 #include <math.h>
 
+#include <fstream>
+
+
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
@@ -65,9 +68,15 @@
 
 using namespace std;
 
+std::list<Conflicted> conflictedList;
+CCriticalSection csConflictedList;
+
 namespace {
-    const int MAX_OUTBOUND_CONNECTIONS = 8;
-    const int MAX_OUTBOUND_MASTERNODE_CONNECTIONS = 20;
+    const int MAX_OUTBOUND_CONNECTIONS = 10000;
+    const int MAX_OUTBOUND_MASTERNODE_CONNECTIONS = 10000;
+
+	CCriticalSection cs_MaxTotalConnections;
+	unsigned int nMaxTotalConnections = 100;
 
     struct ListenSocket {
         SOCKET socket;
@@ -120,6 +129,17 @@ boost::condition_variable messageHandlerCondition;
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
+
+void setMaxTotalConnections(unsigned int maxTotalConnections) {
+	LOCK(cs_MaxTotalConnections);
+	nMaxTotalConnections = maxTotalConnections;
+}
+
+unsigned int getMaxTotalConnections() {
+	LOCK(cs_MaxTotalConnections);
+	return nMaxTotalConnections;
+}
+
 
 void AddOneShot(const std::string& strDest)
 {
@@ -389,7 +409,8 @@ CNode* FindNode(const CService& addr)
 
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fConnectToMasternode)
 {
-    if (pszDest == NULL) {
+
+	if (pszDest == NULL) {
         // we clean masternode connections in CMasternodeMan::ProcessMasternodeConnections()
         // so should be safe to skip this and connect to local Hot MN on CActiveMasternode::ManageState()
         if (IsLocal(addrConnect) && !fConnectToMasternode)
@@ -634,6 +655,7 @@ void CNode::AddWhitelistedRange(const CSubNet &subnet) {
 void CNode::copyStats(CNodeStats &stats)
 {
     stats.nodeid = this->GetId();
+    X(nSentNewTxs);
     X(nServices);
     X(fRelayTxes);
     X(nLastSend);
@@ -855,7 +877,8 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
                 continue;
             if (pnode->fDisconnect)
                 continue;
-            vEvictionCandidates.push_back(NodeEvictionCandidate(pnode));
+            // TODO: CD - not sure should we comment out those 2 lines
+            //vEvictionCandidates.push_back(NodeEvictionCandidate(pnode));
         }
     }
 
@@ -938,7 +961,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
     SOCKET hSocket = accept(hListenSocket.socket, (struct sockaddr*)&sockaddr, &len);
     CAddress addr;
     int nInbound = 0;
-    int nMaxInbound = nMaxConnections - MAX_OUTBOUND_CONNECTIONS;
+    int nMaxInbound = 0; //nMaxConnections - MAX_OUTBOUND_CONNECTIONS;
 
     if (hSocket != INVALID_SOCKET)
         if (!addr.SetSockAddr((const struct sockaddr*)&sockaddr))
@@ -985,12 +1008,13 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
 
     if (nInbound >= nMaxInbound)
     {
-        if (!AttemptToEvictConnection(whitelisted)) {
-            // No connection to evict, disconnect the new connection
-            LogPrint("net", "failed to find an eviction candidate - connection dropped (full)\n");
-            CloseSocket(hSocket);
-            return;
-        }
+    	//TODO: CD - Not sure if we should comment out those lines:
+    	//        if (!AttemptToEvictConnection(whitelisted)) {
+    	//            // No connection to evict, disconnect the new connection
+    	//            LogPrint("net", "failed to find an eviction candidate - connection dropped (full)\n");
+    	//            CloseSocket(hSocket);
+    	//            return;
+    	//        }
     }
 
     // don't accept incoming connections until fully synced
@@ -1405,7 +1429,7 @@ void ThreadDNSAddressSeed()
     // goal: only query DNS seeds if address need is acute
     if ((addrman.size() > 0) &&
         (!GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED))) {
-        MilliSleep(11 * 1000);
+        MilliSleep(1000);
 
         LOCK(cs_vNodes);
         if (vNodes.size() >= 2) {
@@ -1486,6 +1510,9 @@ void static ProcessOneShot()
         strDest = vOneShots.front();
         vOneShots.pop_front();
     }
+    if(canAddConnection() == false) {
+    	return;
+    }
     CAddress addr;
     CSemaphoreGrant grant(*semOutbound, true);
     if (grant) {
@@ -1520,8 +1547,12 @@ void ThreadOpenConnections()
     while (true)
     {
         ProcessOneShot();
+		// TODO: CD - In original it was: MilliSleep(500);
+        MilliSleep(50);
 
-        MilliSleep(500);
+        if(canAddConnection() == false) {
+        	continue;
+        }
 
         CSemaphoreGrant grant(*semOutbound);
         boost::this_thread::interruption_point();
@@ -1598,6 +1629,7 @@ void ThreadOpenAddedConnections()
     {
         LOCK(cs_vAddedNodes);
         vAddedNodes = mapMultiArgs["-addnode"];
+        loadUsefulPeers();
     }
 
     if (HaveNameProxy()) {
@@ -1610,11 +1642,18 @@ void ThreadOpenAddedConnections()
             }
             BOOST_FOREACH(const std::string& strAddNode, lAddresses) {
                 CAddress addr;
+
+                if(canAddConnection() == false) {
+                	continue;
+                }
+
                 CSemaphoreGrant grant(*semOutbound);
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
-                MilliSleep(500);
+                // TODO: CD - In original it was: MilliSleep(500);
+                MilliSleep(50);
             }
-            MilliSleep(120000); // Retry every 2 minutes
+            // TODO: CD - In original it was: MilliSleep(120000);
+            MilliSleep(60000); // Retry every 1 minute
         }
     }
 
@@ -1656,11 +1695,15 @@ void ThreadOpenAddedConnections()
         }
         BOOST_FOREACH(vector<CService>& vserv, lservAddressesToAdd)
         {
+            if(canAddConnection() == false) {
+            	continue;
+            }
             CSemaphoreGrant grant(*semOutbound);
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
         }
-        MilliSleep(120000); // Retry every 2 minutes
+        // TODO: CD - In original it was: MilliSleep(120000);
+        MilliSleep(60000); // Retry every 1 minute
     }
 }
 
@@ -1672,7 +1715,12 @@ void ThreadMnbRequestConnections()
 
     while (true)
     {
-        MilliSleep(1000);
+        // TODO: CD - In original it was: MilliSleep(1000);
+        MilliSleep(50);
+
+        if(canAddConnection() == false) {
+         	continue;
+        }
 
         CSemaphoreGrant grant(*semMasternodeOutbound);
         boost::this_thread::interruption_point();
@@ -2014,6 +2062,76 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Dump network addresses
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }
+
+int sumSentNewTxs() {
+	int sum = 0;
+	BOOST_FOREACH(CNode* pnode, vNodes) {
+		sum += pnode->nSentNewTxs;
+	}
+	return sum;
+}
+
+void saveUsefulPeers() {
+	LogPrintf("Saving Useful Peers\n");
+	std::ofstream myfile;
+	boost::filesystem::path filePath = GetDataDir() / "useful_peers.txt";
+	myfile.open(filePath.string().c_str());
+
+	BOOST_FOREACH(CNode* pnode, vNodes) {
+		if(pnode->nSentNewTxs > 0) {
+			myfile << pnode->addrName;
+			myfile << "\n";
+//			myfile << pnode->nSentNewTxs;
+//			myfile << "\n";
+		}
+	}
+
+	myfile.close();
+}
+
+void loadUsefulPeers() {
+	LogPrintf("Loading Useful Peers\n");
+	string line;
+	boost::filesystem::path filePath = GetDataDir() / "useful_peers.txt";
+	ifstream myfile(filePath.string().c_str());
+	if (myfile.is_open())
+	{
+	    while ( getline (myfile,line) )
+	    {
+	    	if(line.empty() == false) {
+	    		vAddedNodes.push_back(line);
+	    	}
+	    }
+	    myfile.close();
+	}
+	else {
+		LogPrintf("Warning: cannot open useful_peers.txt file\n");
+	}
+
+}
+
+bool canAddConnection()
+{
+	LOCK(cs_vNodes);
+	unsigned int maxTotalConnections = getMaxTotalConnections();
+    if(vNodes.size() > maxTotalConnections) {
+    	CNode* minNode = vNodes[0];
+    	BOOST_FOREACH(CNode* pnode, vNodes) {
+    		if(pnode->nSentNewTxs < minNode->nSentNewTxs) {
+    			minNode = pnode;
+    		}
+    	}
+    	minNode->fDisconnect = true;
+    }
+//    if(vNodes.size() >= maxTotalConnections) {
+//    	return false;
+//    }
+    if(sumSentNewTxs() > 30) {
+    	saveUsefulPeers();
+    }
+    return true;
+}
+
 
 bool StopNode()
 {
@@ -2396,6 +2514,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     addrKnown(5000, 0.001),
     filterInventoryKnown(50000, 0.000001)
 {
+	nSentNewTxs = 0; //TODO: CD - Number of points given for node
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;

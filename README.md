@@ -6,17 +6,27 @@ Dash Core staging tree 0.12.1
 https://www.dash.org
 
 
-What is Dash?
+Preparing system (Ubuntu 16)
 ----------------
 
-Dash is an experimental new digital currency that enables anonymous, instant
-payments to anyone, anywhere in the world. Dash uses peer-to-peer technology
-to operate with no central authority: managing transactions and issuing money
-are carried out collectively by the network. Dash Core is the name of the open
-source software which enables the use of this currency.
+* sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
 
-For more information, as well as an immediately useable, binary version of
-the Dash Core software, see https://www.dash.org/get-dash/.
+* sudo apt-get install libboost-all-dev
+
+* sudo apt-get install software-properties-common
+* sudo add-apt-repository ppa:bitcoin/bitcoin
+* sudo apt-get update
+* sudo apt-get install libdb4.8-dev libdb4.8++-dev
+
+
+
+How to build (Ubuntu 16)
+----------------
+
+* ./autogen.sh
+* ./configure
+* make
+* make install (optional)
 
 
 License

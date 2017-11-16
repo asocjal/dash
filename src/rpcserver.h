@@ -171,7 +171,11 @@ extern std::string HelpExampleRpc(const std::string& methodname, const std::stri
 
 extern void EnsureWalletIsUnlocked();
 
+extern UniValue getconflictedtransactions(const UniValue& params, bool fHelp); // in rpcnet.cpp
 extern UniValue getconnectioncount(const UniValue& params, bool fHelp); // in rpcnet.cpp
+extern UniValue getmaxconnectioncount(const UniValue& params, bool fHelp); // in rpcnet.cpp
+extern UniValue setmaxconnectioncount(const UniValue& params, bool fHelp); // in rpcnet.cpp
+extern UniValue getsumofnewtransactions(const UniValue& params, bool fHelp); // in rpcnet.cpp
 extern UniValue getaddressmempool(const UniValue& params, bool fHelp);
 extern UniValue getaddressutxos(const UniValue& params, bool fHelp);
 extern UniValue getaddressdeltas(const UniValue& params, bool fHelp);

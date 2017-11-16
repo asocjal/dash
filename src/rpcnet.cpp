@@ -24,6 +24,41 @@
 
 using namespace std;
 
+//static CSemaphore *semWait = new CSemaphore(10);
+
+UniValue getconflictedtransactions(const UniValue& params, bool fHelp)
+{
+
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getconflictedtransactions\n"
+            "\nResturnes list of conflicted transactions\n"
+            "\nResult:\n"
+            "n          Rejected transaction\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getconflictedtransactions", "")
+            + HelpExampleRpc("getconflictedtransactions", "")
+        );
+
+	UniValue ret(UniValue::VARR);
+
+	LOCK(csConflictedList);
+
+	BOOST_FOREACH(const Conflicted &conflicted, conflictedList) {
+		UniValue obj(UniValue::VOBJ);
+		obj.push_back(Pair("tx_id_1", conflicted.txId1));
+		obj.push_back(Pair("tx_id_2", conflicted.txId2));
+		ret.push_back(obj);
+	}
+
+//	Conflicted conflicted;
+//	conflicted.txId1 = "abc";
+//	conflicted.txId2 = "drf";
+//	conflictedList.push_back(conflicted);
+
+    return ret;
+}
+
 UniValue getconnectioncount(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -40,6 +75,78 @@ UniValue getconnectioncount(const UniValue& params, bool fHelp)
     LOCK2(cs_main, cs_vNodes);
 
     return (int)vNodes.size();
+}
+
+UniValue getmaxconnectioncount(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getmaxconnectioncount\n"
+            "\nReturns the maximum number of connections to other nodes.\n"
+            "\nResult:\n"
+            "n          (numeric) The connection count\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getmaxconnectioncount", "")
+            + HelpExampleRpc("getmaxconnectioncount", "")
+        );
+
+    return (int)getMaxTotalConnections();
+}
+
+UniValue setmaxconnectioncount(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "setmaxconnectioncount\n"
+            "\nSets maximum number of connections\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setmaxconnectioncount", "50")
+            + HelpExampleRpc("setmaxconnectioncount", "50")
+        );
+
+    int maxTotalConnections = atoi(params[0].get_str());
+
+    if(maxTotalConnections < 0) {
+        throw runtime_error(
+            "setmaxconnectioncount\n"
+            "\nMax total connection count cannot be lower than 0 (zero)"
+        );
+    }
+
+    if(maxTotalConnections > 10000) {
+        throw runtime_error(
+            "setmaxconnectioncount\n"
+            "\nMax total connection count cannot be higher than 10000"
+        );
+    }
+
+    setMaxTotalConnections(maxTotalConnections);
+//    MAX_OUTBOUND_MASTERNODE_CONNECTIONS = v;
+    return NullUniValue;
+}
+
+// TODO: CD
+UniValue getsumofnewtransactions(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getsumofnewtransactions\n"
+            "\nSets sum of new transactions received by all connected nodes\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getsumofnewtransactions", "")
+            + HelpExampleRpc("getsumofnewtransactions", "")
+        );
+
+    uint32_t sum = 0;
+
+    {
+		LOCK(cs_vNodes);
+		BOOST_FOREACH(CNode* pnode, vNodes) {
+			sum+= pnode->nSentNewTxs;
+		}
+    }
+
+    return (int)sum;
 }
 
 UniValue ping(const UniValue& params, bool fHelp)
@@ -132,6 +239,7 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
         obj.push_back(Pair("id", stats.nodeid));
+        obj.push_back(Pair("new_transactions_sent", (uint64_t)stats.nSentNewTxs)); //TODO: CD - Own code
         obj.push_back(Pair("addr", stats.addrName));
         if (!(stats.addrLocal.empty()))
             obj.push_back(Pair("addrlocal", stats.addrLocal));

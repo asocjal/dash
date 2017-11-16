@@ -63,7 +63,7 @@ static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
 /** The maximum number of entries in setAskFor (larger due to getdata latency)*/
 static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
-static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
+static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 10000;
 /** The default for -maxuploadtarget. 0 = Unlimited */
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 /** Default for blocks only*/
@@ -78,6 +78,9 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;  // Defaul
 
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
+
+void setMaxTotalConnections(unsigned int maxTotalConnections);
+unsigned int getMaxTotalConnections();
 
 void AddOneShot(const std::string& strDest);
 void AddressCurrentlyConnected(const CService& addr);
@@ -97,6 +100,15 @@ bool StopNode();
 void SocketSendData(CNode *pnode);
 
 typedef int NodeId;
+
+struct Conflicted
+{
+	std::string txId1;
+	std::string txId2;
+};
+
+extern std::list<Conflicted> conflictedList;
+extern CCriticalSection csConflictedList;
 
 struct CombinerAll
 {
@@ -138,6 +150,10 @@ enum
     LOCAL_MAX
 };
 
+int sumSentNewTxs();
+void loadUsefulPeers();
+void saveUsefulPeers();
+bool canAddConnection();
 bool IsPeerAddrLocalGood(CNode *pnode);
 void AdvertiseLocal(CNode *pnode);
 void SetLimited(enum Network net, bool fLimited = true);
@@ -152,7 +168,6 @@ bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
 bool IsReachable(enum Network net);
 bool IsReachable(const CNetAddr &addr);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
-
 
 extern bool fDiscover;
 extern bool fListen;
@@ -191,6 +206,7 @@ class CNodeStats
 {
 public:
     NodeId nodeid;
+    uint32_t nSentNewTxs; //TODO: CD - how many new transaction this node sands. More means node is more usefull
     uint64_t nServices;
     bool fRelayTxes;
     int64_t nLastSend;
@@ -318,6 +334,7 @@ typedef std::map<CSubNet, CBanEntry> banmap_t;
 class CNode
 {
 public:
+	uint32_t nSentNewTxs; //TODO: CD - how many new transaction this node sands. More means node is more usefull
     // socket
     uint64_t nServices;
     SOCKET hSocket;

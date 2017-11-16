@@ -1061,6 +1061,20 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetRejectCode());
 }
 
+void addConflictedTransactions(const std::string &hash1, const std::string &hash2) {
+	LOCK(csConflictedList);
+	LogPrint("mempool", "CDLOG: Adding conflicted");
+	Conflicted conflicted;
+	conflicted.txId1 = hash1;
+	conflicted.txId2 = hash2;
+	conflictedList.push_back(conflicted);
+
+	if(conflictedList.size() > 1000) {
+		conflictedList.pop_front();
+	}
+	LogPrint("mempool", "CDLOG: Conflict between %s and %s \n", hash1, hash2);
+}
+
 bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                               bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee,
                               std::vector<uint256>& vHashTxnToUncache, bool fDryRun)
@@ -1128,12 +1142,14 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             {
                 // InstantSend txes are not replacable
                 if(instantsend.HasTxLockRequest(ptxConflicting->GetHash())) {
-                    // this tx conflicts with a Transaction Lock Request candidate
+                    // this tx is a tx lock request and it conflicts with a normal tx
+                	addConflictedTransactions(hash.ToString(), ptxConflicting->GetHash().ToString());
                     return state.DoS(0, error("AcceptToMemoryPool : Transaction %s conflicts with Transaction Lock Request %s",
                                             hash.ToString(), ptxConflicting->GetHash().ToString()),
                                     REJECT_INVALID, "tx-txlockreq-mempool-conflict");
                 } else if (instantsend.HasTxLockRequest(hash)) {
                     // this tx is a tx lock request and it conflicts with a normal tx
+                	addConflictedTransactions(hash.ToString(), ptxConflicting->GetHash().ToString());
                     return state.DoS(0, error("AcceptToMemoryPool : Transaction Lock Request %s conflicts with transaction %s",
                                             hash.ToString(), ptxConflicting->GetHash().ToString()),
                                     REJECT_INVALID, "txlockreq-tx-mempool-conflict");
@@ -1162,9 +1178,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
                         }
                     }
                 }
-                if (fReplacementOptOut)
-                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-
+                if (fReplacementOptOut) {
+                	addConflictedTransactions(tx.GetHash().ToString(), ptxConflicting->GetHash().ToString());
+                	return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+                }
                 setConflicts.insert(ptxConflicting->GetHash());
             }
         }
@@ -1491,6 +1508,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         // Remove conflicting transactions from the mempool
         BOOST_FOREACH(const CTxMemPool::txiter it, allConflicting)
         {
+        	 //TODO: CD - replace by feee
             LogPrint("mempool", "replacing tx %s with %s for %s BTC additional fees, %d delta bytes\n",
                     it->GetTx().GetHash().ToString(),
                     hash.ToString(),
@@ -5271,7 +5289,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
     }
 }
 
-bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
+bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived) //TODO: CD - Incoming transactions
 {
     const CChainParams& chainparams = Params();
     RandAddSeedPerfmon();
@@ -5802,6 +5820,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         mapAlreadyAskedFor.erase(inv.hash);
 
+        if(AlreadyHave(inv)) {
+        	LogPrintf("CDLOG: Node sends already have transaction. Node is: %s \n", pfrom->addrName);
+        }
+
         if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
             // Process custom txes, this changes AlreadyHave to "true"
@@ -5819,6 +5841,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
 
+            pfrom->nSentNewTxs++; //TODO: CD - Multithreading problem?
+            LogPrintf("CDLOG: Update nSentNewTxs. Node is: %s, counter is %i \n", pfrom->addrName, pfrom->nSentNewTxs);
             LogPrint("mempool", "AcceptToMemoryPool: peer=%d: accepted %s (poolsz %u txn, %u kB)\n",
                 pfrom->id,
                 tx.GetHash().ToString(),
